@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8" />
+<title>Tree planting simulation site, KabinBuriDistrict</title>
+
+<style>
+    body {
+        margin: 0;
+        padding: 0;
+        font-family: "Prompt", sans-serif;
+        background: #eef7ee;
+    }
+    .header {
+        background: linear-gradient(120deg, #43a047, #2e7d32);
+        padding: 25px;
+        text-align: center;
+        color: white;
+        font-size: 28px;
+        font-weight: bold;
+        letter-spacing: 1px;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    }
+    .container { max-width: 1200px; margin: auto; padding: 20px; }
+    .card {
+        background: white; padding: 25px; border-radius: 18px;
+        margin-bottom: 30px; box-shadow: 0 6px 18px rgba(0,0,0,0.12);
+        animation: fadeIn 0.6s ease;
+    }
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    select, input, button {
+        width: 100%; padding: 14px; margin-top: 14px;
+        border-radius: 10px; border: 1px solid #bdbdbd; font-size: 17px;
+        transition: 0.25s;
+    }
+    button {
+        background: #43a047; color: white; border: none;
+        cursor: pointer; margin-top: 18px;
+        font-size: 18px; font-weight: bold;
+    }
+    button:hover { background: #2e7d32; transform: scale(1.03); }
+    .tree-img {
+        width: 220px; height: 220px; border-radius: 14px; object-fit: cover;
+        margin-top: 15px; display: none;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+        animation: fadeIn 0.8s ease;
+    }
+    .result {
+        background: #f1f8e9; border: 1px solid #c5e1a5;
+        font-size: 17px; line-height: 30px;
+    }
+</style>
+</head>
+
+<body>
+
+<div class="header">🌱 Tree planting simulation site, KabinBuriDistrict</div>
+
+<div class="container">
+
+    <div class="card">
+        <h2>🌳 ตัวจำลองการปลูกต้นไม้</h2>
+        <p>เลือกชนิดต้นไม้ แล้วกรอกจำนวนไร่เพื่อดูข้อมูลจำลองแบบละเอียด</p>
+
+       <select id="treeSelect">
+    <option value="">-- เลือกชนิดต้นไม้ --</option>
+
+    <optgroup label="🍎 ไม้ผล">
+        <option value="มะม่วงมันขุนศรี">มะม่วงมันขุนศรี</option>
+        <option value="ทุเรียนหมอนทอง">ทุเรียนหมอนทอง</option>
+        <option value="มะพร้าวน้ำหอม">มะพร้าวน้ำหอม</option>
+        <option value="มะนาว">มะนาว</option>
+        <option value="เงาะ">เงาะ</option>
+        <option value="ลำไย">ลำไย</option>
+        <option value="กล้วยน้ำว้า">กล้วยน้ำว้า</option>
+        <option value="แก้วมังกร">แก้วมังกร</option>
+    </optgroup>
+
+    <optgroup label="🌾 พืชเศรษฐกิจ">
+        <option value="มันสำปะหลัง">มันสำปะหลัง</option>
+    </optgroup>
+
+    <optgroup label="🌲 ไม้โตเร็ว / ไม้ใช้สอย">
+        <option value="ยูคา">ยูคา</option>
+    </optgroup>
+</select>
+
+        <img id="treeImage" class="tree-img" />
+
+        <h3 style="margin-top:20px;">📐 ป้อนขนาดพื้นที่ (ไร่)</h3>
+        <input type="number" id="area" placeholder="จำนวนไร่ เช่น 5">
+
+        <button onclick="simulate()">เริ่มจำลอง</button>
+    </div>
+
+    <div class="card">
+        <h3>📈 กราฟการเจริญเติบโต</h3>
+        <canvas id="growthChart"></canvas>
+    </div>
+
+    <div class="card result" id="resultBox" style="display:none;"></div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+
+const treeImages = {
+    "มะม่วงมันขุนศรี": "https://i.postimg.cc/280SrGwv/856.jpg",
+    "ทุเรียนหมอนทอง": "https://i.postimg.cc/RFmBcJdW/855.jpg",
+    "มะพร้าวน้ำหอม": "https://i.postimg.cc/3rkkXW1X/44.jpg",
+    "แก้วมังกร": "https://i.postimg.cc/bvYJsvdr/33.jpg",
+    "มะนาว": "https://i.postimg.cc/mZ1rcJZ7/88.jpg",
+    "กล้วยน้ำว้า": "https://i.postimg.cc/HnjP5Tq1/8556.jpg",
+    "เงาะ": "https://i.postimg.cc/bvdh7Ss6/89.jpg",
+    "ลำไย": "https://i.postimg.cc/0yyRSKGL/99.jpg",
+    "ยูคา": "https://i.postimg.cc/G2H9hpK0/54.jpg",
+    "มันสำปะหลัง": "https://i.postimg.cc/63m2dZqr/88.jpg"
+};
+
+const treeData = {
+    "มะม่วงมันขุนศรี": { growTime: 365 * 2.2, maxHeight: 8, cost: 65, revenue: 350, spacing: 4,
+        soil: "ดินร่วนซุย มีอินทรียวัตถุสูง",
+        climate: "อากาศร้อนชื้น ปริมาณน้ำปานกลาง",
+        water: "รดน้ำวันเว้นวัน",
+        sunlight: "แสงแดดจัดมาก",
+        fertilizer: "ปุ๋ยคอก + สูตร 8-24-24 ช่วงทำดอก และ 15-15-15 ช่วงเร่งต้น",
+        season: "ปลูกดีช่วงปลายปี - ต้นฤดูฝน "
+    },
+
+    "ทุเรียนหมอนทอง": { 
+        growTime: 365 * 5, maxHeight: 15, cost: 250, revenue: 1800, spacing: 8,
+        soil: "ดินร่วนปนทราย ระบายน้ำดี ไม่ท่วมขัง",
+        climate: "ชื้นมาก ต้องการฝนสม่ำเสมอ",
+        water: "รดน้ำทุกวัน ห้ามให้ขาดน้ำ",
+        sunlight: "แดดจัด",
+        fertilizer: "ปุ๋ยรองก้นหลุม 15-15-15 และเสริมด้วย 13-13-21 ช่วงทำดอก",
+        season: "ปลูกช่วงต้นฤดูฝน "
+    },
+
+    "กล้วยน้ำว้า": { 
+        growTime: 365 * 0.7, maxHeight: 4.5, cost: 25, revenue: 180, spacing: 1.5,
+        soil: "ดินร่วนชื้น มีน้ำเพียงพอ",
+        climate: "อากาศร้อนชื้น",
+        water: "รดน้ำทุกวัน",
+        sunlight: "แดดปานกลางถึงจัด",
+        fertilizer: "ปุ๋ยคอก + สูตร 13-13-21 และยูเรียเร่งการแตกหน่อ",
+        season: "ปลายฝน "
+    },
+
+    "มะพร้าวน้ำหอม": { 
+        growTime: 365 * 3, maxHeight: 20, cost: 80, revenue: 500, spacing: 6,
+        soil: "ดินเหนียวหรือดินร่วน",
+        climate: "ร้อน ชื้น",
+        water: "วันเว้นวัน",
+        sunlight: "มาก",
+        fertilizer: "ปุ๋ยคอก + ปุ๋ยสูตร 13-13-21",
+        season: "ปลายฤดูฝน - ต้นฤดูหนาว "
+    },
+    "แก้วมังกร": { 
+        growTime: 365 * 1.5, maxHeight: 3, cost: 40, revenue: 200, spacing: 2,
+        soil: "ดินร่วนปนทราย",
+        climate: "ร้อนแล้ง",
+        water: "วันเว้นวัน",
+        sunlight: "ปานกลาง",
+        fertilizer: "ปุ๋ยคอก + สูตร 15-15-15 หรือ 8-24-24 ตอนออกดอก",
+        season: "ต้นฤดูฝน "
+    },
+    "มะนาว": { 
+        growTime: 365 * 1, maxHeight: 3.5, cost: 30, revenue: 250, spacing: 2,
+        soil: "ดินร่วน",
+        climate: "อากาศร้อน",
+        water: "วันเว้นวัน",
+        sunlight: "มาก",
+        fertilizer: "ปุ๋ยคอก + สูตร 16-16-16 หรือยูเรียเร่งใบ",
+        season: "ตลอดทั้งปี แต่ดีที่สุดคือ ฤดูฝน "
+    },
+    "เงาะ": { 
+        growTime: 365 * 2.5, maxHeight: 14, cost: 70, revenue: 500, spacing: 5,
+        soil: "ดินร่วนระบายน้ำดี",
+        climate: "ฝนตกชุก",
+        water: "ให้น้ำทุก 7-10 วัน ต่อครั้ง",
+        sunlight: "มาก",
+        fertilizer: "ปุ๋ยคอก + 15-15-15 และเสริมโพแทสเซียม 0-0-60",
+        season: "ต้นฤดูฝน "
+    },
+    "ลำไย": { 
+        growTime: 365 * 3, maxHeight: 11, cost: 60, revenue: 450, spacing: 5,
+        soil: "ดินร่วนปนทราย",
+        climate: "ร้อนแล้งปานกลาง",
+        water: "ให้น้ำ 4-7 วัน ต่อครั้ง",
+        sunlight: "ปานกลาง",
+        fertilizer: "ปุ๋ยคอก + 46-0-0 ช่วงเร่งใบ และ 8-24-24 ช่วงทำดอก",
+        season: "ปลายฤดูหนาว "
+    },
+    "ยูคา": {
+        growTime: 365 * 3, maxHeight: 28, cost: 15, revenue: 120, spacing: 2.5,
+        soil: "ดินร่วน ดินเหนียว ดินทราย ปลูกได้แทบทุกชนิด",
+        climate: "อากาศร้อนแล้ง ทนแล้ง",
+        water: "น้ำน้อย ดูแลง่าย",
+        sunlight: "แดดจัด",
+        fertilizer: "แทบไม่ต้องใส่ปุ๋ย แต่ถ้าต้องการเร่งโตใช้ 15-15-15",
+        season: "ปลูกได้ตลอดทั้งปี"
+    },
+
+    "มันสำปะหลัง": {
+        growTime: 365 * 1, maxHeight: 2.5, cost: 8, revenue: 80, spacing: 1,
+        soil: "ดินร่วนปนทราย หรือดินร่วนแข็ง",
+        climate: "อากาศร้อน ทนแล้งได้ดี",
+        water: "ต้องการน้ำน้อย",
+        sunlight: "แดดจัด",
+        fertilizer: "ปุ๋ยสูตร 15-7-18 หรือปุ๋ยคอก",
+        season: "ปลูกดีช่วงต้นฝน"
+    }
+};
+
+let chart;
+
+document.getElementById("treeSelect").addEventListener("change", function () {
+    const tree = this.value;
+    const img = document.getElementById("treeImage");
+    if (tree) {     
+        img.src = treeImages[tree];
+        img.style.display = "block";
+    } else {
+        img.style.display = "none";
+    }
+});
+
+function simulate() {
+    const select = document.getElementById("treeSelect").value;
+    const area = parseFloat(document.getElementById("area").value);
+
+    if (!select) return alert("กรุณาเลือกต้นไม้ก่อน");
+    if (!area || area <= 0) return alert("กรุณากรอกจำนวนไร่ให้ถูกต้อง");
+
+    const data = treeData[select];
+
+    const treesPerRai = Math.floor(1600 / (data.spacing * data.spacing));
+    const totalTrees = treesPerRai * area;
+      
+    const totalCost = totalTrees * data.cost;
+    const totalRevenue = totalTrees * data.revenue;
+    const totalProfit = totalRevenue - totalCost;
+
+    drawGrowthChart(data);
+
+    const years = Math.floor(data.growTime / 365);
+    const months = Math.round((data.growTime % 365) / 30);
+
+    document.getElementById("resultBox").style.display = "block";
+    document.getElementById("resultBox").innerHTML = `
+        <h3>ผลการจำลอง: ${select}</h3>
+        <p>📅 ระยะเวลาปลูก: <b>${years} ปี ${months} เดือน</b></p>
+        <p>📌 ปลูกได้ต่อไร่: <b>${treesPerRai.toLocaleString()} ต้น</b></p>
+        <p>📐 พื้นที่ต่อต้น: <b>${((data.spacing * data.spacing) / 4).toFixed(2)} ตารางวา</b></p>
+        <p>🌳 จำนวนต้นทั้งหมด: <b>${totalTrees.toLocaleString()} ต้น</b></p>
+
+        <p>🌱 ดินที่เหมาะสม: <b>${data.soil}</b></p>
+        <p>⛅ สภาพอากาศ: <b>${data.climate}</b></p>
+        <p>💦 น้ำที่ต้องการ: <b>${data.water}</b></p>
+        <p>🌞 แสงแดด: <b>${data.sunlight}</b></p>
+        <p>🧪 ปุ๋ยแนะนำ: <b>${data.fertilizer}</b></p>
+        <p>📆 ฤดูกาลที่เหมาะสม: <b>${data.season}</b></p>
+
+
+        <hr>
+        <p>💰 ค่าใช้จ่ายโดยประมาณ: <b>${totalCost.toLocaleString()} บาท</b></p>
+        <p>💵 รายได้โดยประมาณ: <b>${totalRevenue.toLocaleString()} บาท</b></p>
+        <p>📈 กำไรสุทธิโดยประมาณ: <b style="color:green;">${totalProfit.toLocaleString()} บาท</b></p>
+    `;
+}
+function getSeasonFactor(month) {
+    const startMonth = 5; // พฤษภาคม
+    const m = (month + startMonth) % 12;
+
+    // ☔ ฤดูฝน: พ.ค. – ต.ค.
+    if (m >= 5 && m <= 10) {
+        const progress = (m - 5) / 5; // 0 → 1
+        return 1.0 + Math.sin(progress * Math.PI) * 0.3;
+    }
+
+    // ☀️ ฤดูแล้ง
+    return 0.85 + Math.sin((m / 12) * Math.PI) * 0.05;
+}
+function drawGrowthChart(tree) {
+    const totalMonths = Math.round(tree.growTime / 30);
+    const labels = [];
+    const heights = [];
+
+    for (let m = 0; m <= totalMonths; m++) {
+        labels.push(m % 3 === 0 ? `เดือน ${m}` : "");
+
+
+
+        const growthRatio = m / totalMonths;
+        const seasonFactor = getSeasonFactor(m);
+
+        const initialHeight = tree.maxHeight * 0.02;
+        let height = initialHeight + (tree.maxHeight - initialHeight)
+            * Math.pow(growthRatio, 1.2)
+            * seasonFactor;
+
+        height = Math.min(height, tree.maxHeight);
+        heights.push(Number(height.toFixed(2)));
+    }
+
+    if (chart) chart.destroy();
+
+    chart = new Chart(document.getElementById("growthChart"), {
+        type: "line",
+        data: {
+            labels,
+            datasets: [{
+                label: "อัตราการเจร็ญเติบโต (เซนติเมตร)",
+                data: heights,
+                borderWidth: 3,
+                tension: 0.45
+            }]
+        },
+        options: {
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: "ความสูง (เมตร)"
+                    }
+                }
+            }
+        }
+    });
+}
+</script>
+
+</body>
+</html>
